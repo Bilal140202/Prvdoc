@@ -29,30 +29,6 @@ function App() {
   const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize PrivacyThink on component mount
-  useEffect(() => {
-    initializeApp();
-  }, []);
-
-  // Update system status periodically
-  useEffect(() => {
-    const updateStatus = async () => {
-      try {
-        const status = await ragService.getSystemStatus();
-        setSystemStatus({
-          ...status,
-          isOnline: navigator.onLine
-        });
-      } catch (error) {
-        console.error('Failed to update status:', error);
-      }
-    };
-
-    updateStatus();
-    const interval = setInterval(updateStatus, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
   const initializeApp = async () => {
     try {
       setError(null);
@@ -80,6 +56,30 @@ function App() {
       setError(error instanceof Error ? error.message : 'Failed to initialize PrivacyThink');
     }
   };
+
+  // Initialize PrivacyThink on component mount
+  useEffect(() => {
+    initializeApp();
+  }, []);
+
+  // Update system status periodically
+  useEffect(() => {
+    const updateStatus = async () => {
+      try {
+        const status = await ragService.getSystemStatus();
+        setSystemStatus({
+          ...status,
+          isOnline: navigator.onLine
+        });
+      } catch (error) {
+        console.error('Failed to update status:', error);
+      }
+    };
+
+    updateStatus();
+    const interval = setInterval(updateStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleDocumentUpload = async (files: File[]) => {
     try {
