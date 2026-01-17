@@ -179,7 +179,7 @@ const ModelDownloader: React.FC = () => {
         <div className="download-progress">
           <div className="progress-header">
             <h4>Downloading {downloadProgress.modelName}</h4>
-            <p>This may take a few minutes...</p>
+            <p>{downloadProgress.message || 'This may take a few minutes...'}</p>
           </div>
 
           <div className="progress-bar">

@@ -13,10 +13,15 @@ import type {
   AvailableModel
 } from '../types';
 
-// Configure Transformers.js for local-only operation
-env.allowLocalModels = true;
+// Configure Transformers.js
+// Disable local models to prevent 404 HTML fallback errors (SPA issue); uses remote + cache
+env.allowLocalModels = false;
 env.allowRemoteModels = true; // Only for initial model download
 env.useBrowserCache = true;
+
+// Configure WASM backend to avoid "Invalid atomic access index" errors
+// This disables multi-threading which can be unstable in some browser environments
+env.backends.onnx.wasm.numThreads = 1;
 
 export class PrivacyLLMService {
   private textGenerator: TextGenerationPipeline | null = null;
@@ -58,7 +63,7 @@ export class PrivacyLLMService {
     }
   ];
 
-  async initialize(modelName?: string): Promise<void> {
+  async initialize(modelName?: string, retry = true): Promise<void> {
     if (this.isLoading) {
       throw new Error('Model is already loading');
     }
@@ -71,6 +76,25 @@ export class PrivacyLLMService {
 
       console.log(`🤖 Loading ${targetModel} - ALL processing stays local!`);
       
+      // Check storage availability before starting download
+      if ('storage' in navigator && 'estimate' in navigator.storage) {
+        let estimate;
+        try {
+          estimate = await navigator.storage.estimate();
+        } catch (storageError) {
+          console.warn('⚠️ Could not verify storage space:', storageError);
+        }
+
+        if (estimate && estimate.quota && estimate.usage) {
+          const availableSpace = estimate.quota - estimate.usage;
+          const requiredSpace = this.getModelSize(targetModel) * 2; // Buffer for unzip/cache
+
+          if (availableSpace < requiredSpace) {
+            throw new Error(`Insufficient storage space. Need ${Math.round(requiredSpace / 1024 / 1024)}MB, but only ${Math.round(availableSpace / 1024 / 1024)}MB available.`);
+          }
+        }
+      }
+
       // Set up progress tracking
       this.downloadProgress = {
         modelName: targetModel,
@@ -114,10 +138,51 @@ export class PrivacyLLMService {
       console.log('✅ LLM loaded successfully - Ready for private document analysis!');
       
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // Handle corrupted cache from previous failed downloads
+      // "offset is out of bounds" suggests reading past end of file (e.g. reading binary offset in HTML file)
+      // "Unexpected token <" suggests parsing HTML as JSON
+      if (retry && (
+        errorMessage.includes('offset is out of bounds') ||
+        errorMessage.includes('Unexpected token') ||
+        errorMessage.includes('invalid json')
+      )) {
+        console.warn('⚠️  Cache corruption detected. Clearing cache and retrying...');
+
+        try {
+          if ('caches' in window) {
+            // Inform user we are recovering
+            this.downloadProgress = {
+              ...this.downloadProgress!,
+              status: 'downloading', // Keep status as downloading so UI doesn't show error yet
+              message: 'Cache corruption detected. Clearing cache and retrying...'
+            };
+
+            const cacheKeys = await caches.keys();
+            for (const key of cacheKeys) {
+              if (key.includes('transformers')) {
+                await caches.delete(key);
+                console.log(`🧹 Deleted cache: ${key}`);
+              }
+            }
+
+            // Wait a moment for cache operations to settle
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+
+          this.isLoading = false;
+          // Retry without recursion limit (retry=false)
+          return this.initialize(modelName, false);
+        } catch (cacheError) {
+          console.error('Failed to clear cache:', cacheError);
+        }
+      }
+
       this.downloadProgress = {
         ...this.downloadProgress!,
         status: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: errorMessage
       };
       
       console.error('❌ Failed to load LLM:', error);
@@ -136,7 +201,9 @@ export class PrivacyLLMService {
         bytesLoaded: progress.loaded,
         totalBytes: progress.total,
         progress: Math.round((progress.loaded / progress.total) * 100),
-        speed: progress.speed
+        speed: progress.speed,
+        // Show specific file being downloaded if available (e.g. "Downloading model.onnx...")
+        message: progress.file ? `Downloading ${progress.file}...` : this.downloadProgress.message
       };
     }
   }
