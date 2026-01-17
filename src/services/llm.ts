@@ -19,6 +19,10 @@ env.allowLocalModels = false;
 env.allowRemoteModels = true; // Only for initial model download
 env.useBrowserCache = true;
 
+// Configure WASM backend to avoid "Invalid atomic access index" errors
+// This disables multi-threading which can be unstable in some browser environments
+env.backends.onnx.wasm.numThreads = 1;
+
 export class PrivacyLLMService {
   private textGenerator: TextGenerationPipeline | null = null;
   private embedder: FeatureExtractionPipeline | null = null;

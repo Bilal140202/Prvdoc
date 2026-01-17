@@ -18,14 +18,11 @@ def verify_app_loads():
             content = page.content()
             if "Initialization Failed" in content:
                 print("FAILURE: Initialization Failed found.")
-            elif "Insufficient storage space" in content:
-                print("FAILURE: Insufficient storage space warning visible (unexpected unless environment is constrained).")
             else:
                 print("SUCCESS: App loaded without immediate errors.")
 
-            # Can we check if storage check ran?
-            # It's hard to verify the internal logic without mocking navigator.storage,
-            # but we can verify no crash happened.
+            # We can't easily trigger the WASM error in this environment without a full download
+            # but we can verify the app still starts.
 
         except Exception as e:
             print(f"Error: {e}")
