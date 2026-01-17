@@ -1,5 +1,39 @@
 /* Global CSS Reset and Base Styles for PrivacyThink */
 
+:root {
+  /* Design Tokens */
+  --primary-color: #1e40af;
+  --primary-light: #3b82f6;
+  --secondary-color: #059669;
+  --danger-color: #dc2626;
+  --warning-color: #d97706;
+  --success-color: #059669;
+
+  --background: #f8fafc;
+  --surface: #ffffff;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+  --radius: 8px;
+  --radius-lg: 12px;
+
+  --spacing-sm: 0.5rem;
+  --spacing: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+
+  /* Scrollbar Colors */
+  --scrollbar-track: #f1f5f9;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+}
+
 *,
 *::before,
 *::after {
@@ -19,8 +53,8 @@ body {
                'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f8fafc;
-  color: #1e293b;
+  background-color: var(--background);
+  color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
 }
@@ -31,7 +65,7 @@ code {
 
 /* Focus styles for accessibility */
 *:focus {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid var(--primary-light);
   outline-offset: 2px;
 }
 
@@ -46,16 +80,16 @@ code {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* Print styles */
@@ -98,7 +132,7 @@ code {
   }
 }
 
-/* Dark mode support (future enhancement) */
+/* Dark mode support */
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0f172a;
@@ -107,5 +141,9 @@ code {
     --text-secondary: #94a3b8;
     --border: #334155;
     --border-light: #475569;
+
+    --scrollbar-track: #1e293b;
+    --scrollbar-thumb: #475569;
+    --scrollbar-thumb-hover: #64748b;
   }
 }
