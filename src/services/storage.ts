@@ -96,6 +96,28 @@ export class PrivacyStorageService {
     return this.db;
   }
 
+  private hydrateDocument(storedDoc: StoredDocument): Document {
+    return {
+      id: storedDoc.id,
+      name: storedDoc.name,
+      type: storedDoc.type,
+      size: storedDoc.size,
+      uploadedAt: new Date(storedDoc.uploadedAt),
+      processedAt: storedDoc.processedAt ? new Date(storedDoc.processedAt) : undefined,
+      content: storedDoc.content,
+      chunks: (storedDoc.chunks || []).map(chunk => ({
+        id: chunk.id,
+        documentId: chunk.documentId,
+        content: chunk.content,
+        startIndex: chunk.startIndex,
+        endIndex: chunk.endIndex,
+        page: chunk.page,
+        embedding: chunk.embedding,
+        metadata: chunk.metadata
+      }))
+    };
+  }
+
   // Document operations - ALL LOCAL
   async saveDocument(document: Document): Promise<void> {
     const db = this.ensureDB();
@@ -140,37 +162,14 @@ export class PrivacyStorageService {
     
     if (!storedDoc) return null;
 
-    return {
-      id: storedDoc.id,
-      name: storedDoc.name,
-      type: storedDoc.type,
-      size: storedDoc.size,
-      uploadedAt: new Date(storedDoc.uploadedAt),
-      processedAt: storedDoc.processedAt ? new Date(storedDoc.processedAt) : undefined,
-      content: storedDoc.content,
-      chunks: storedDoc.chunks.map(chunk => ({
-        id: chunk.id,
-        documentId: chunk.documentId,
-        content: chunk.content,
-        startIndex: chunk.startIndex,
-        endIndex: chunk.endIndex,
-        page: chunk.page,
-        embedding: chunk.embedding,
-        metadata: chunk.metadata
-      }))
-    };
+    return this.hydrateDocument(storedDoc);
   }
 
   async getAllDocuments(): Promise<Document[]> {
     const db = this.ensureDB();
     const storedDocs = await db.getAll('documents');
     
-    return Promise.all(
-      storedDocs.map(async (storedDoc) => {
-        const doc = await this.getDocument(storedDoc.id);
-        return doc!;
-      })
-    );
+    return storedDocs.map((storedDoc) => this.hydrateDocument(storedDoc));
   }
 
   async deleteDocument(id: string): Promise<void> {
