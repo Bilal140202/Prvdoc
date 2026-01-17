@@ -59,19 +59,38 @@ export class PrivacyRAGService {
       this.updateProgress('embedding', 70, 'Generating embeddings...');
       
       // Generate embeddings for all chunks
-      if (document.chunks) {
+      if (document.chunks && document.chunks.length > 0) {
         const totalChunks = document.chunks.length;
+        let completedChunks = 0;
         
-        for (let i = 0; i < document.chunks.length; i++) {
-          const chunk = document.chunks[i];
+        // Parallel processing with concurrency limit to improve performance
+        const CONCURRENCY_LIMIT = 5;
+        // Create a copy of the array for the queue to avoid modifying the original document.chunks array in place while iterating?
+        // Actually we want to modify the chunk objects inside the original array.
+        // But we use a queue for processing.
+        const queue = [...document.chunks];
+
+        const processNext = async () => {
+          while (queue.length > 0) {
+            const chunk = queue.shift();
+            if (!chunk) break;
+
+            // Generate embedding for this chunk
+            chunk.embedding = await llmService.generateEmbedding(chunk.content);
+            completedChunks++;
+
+            const progress = 70 + (completedChunks / totalChunks) * 20;
+            this.updateProgress('embedding', progress,
+              `Processing chunk ${completedChunks} of ${totalChunks}`);
+          }
+        };
+
+        // Start workers
+        const workers = Array(Math.min(CONCURRENCY_LIMIT, totalChunks))
+          .fill(null)
+          .map(() => processNext());
           
-          // Generate embedding for this chunk
-          chunk.embedding = await llmService.generateEmbedding(chunk.content);
-          
-          const progress = 70 + (i / totalChunks) * 20;
-          this.updateProgress('embedding', progress, 
-            `Processing chunk ${i + 1} of ${totalChunks}`);
-        }
+        await Promise.all(workers);
       }
 
       this.updateProgress('indexing', 95, 'Saving to local index...');
