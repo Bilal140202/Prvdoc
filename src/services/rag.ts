@@ -49,14 +49,20 @@ export class PrivacyRAGService {
   }
 
   // Process and index documents - ALL LOCAL
-  async processDocument(file: File): Promise<Document> {
+  async processDocument(file: File, options?: { silent?: boolean }): Promise<Document> {
+    const updateProgress = (stage: ProcessingProgress['stage'], progress: number, message: string) => {
+      if (!options?.silent) {
+        this.updateProgress(stage, progress, message);
+      }
+    };
+
     try {
-      this.updateProgress('uploading', 0, 'Starting document processing...');
+      updateProgress('uploading', 0, 'Starting document processing...');
 
       // Process document content
       const document = await documentProcessor.processDocument(file);
       
-      this.updateProgress('embedding', 70, 'Generating embeddings...');
+      updateProgress('embedding', 70, 'Generating embeddings...');
       
       // Generate embeddings for all chunks
       if (document.chunks) {
@@ -69,22 +75,22 @@ export class PrivacyRAGService {
           chunk.embedding = await llmService.generateEmbedding(chunk.content);
           
           const progress = 70 + (i / totalChunks) * 20;
-          this.updateProgress('embedding', progress, 
+          updateProgress('embedding', progress,
             `Processing chunk ${i + 1} of ${totalChunks}`);
         }
       }
 
-      this.updateProgress('indexing', 95, 'Saving to local index...');
+      updateProgress('indexing', 95, 'Saving to local index...');
       
       // Save to local storage
       await storageService.saveDocument(document);
       
-      this.updateProgress('complete', 100, 'Document ready for analysis!');
+      updateProgress('complete', 100, 'Document ready for analysis!');
       
       return document;
       
     } catch (error) {
-      this.updateProgress('error', 0, `Failed to process document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      updateProgress('error', 0, `Failed to process document: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw error;
     }
   }
@@ -332,22 +338,43 @@ export class PrivacyRAGService {
 
   // Batch operations
   async processMultipleDocuments(files: File[]): Promise<Document[]> {
-    const results: Document[] = [];
+    const results: (Document | null)[] = new Array(files.length).fill(null);
+    const concurrencyLimit = 3;
     
-    for (let i = 0; i < files.length; i++) {
+    let completedCount = 0;
+    const totalFiles = files.length;
+
+    // Create task generator
+    const tasks = files.map((file, index) => async () => {
       try {
-        this.updateProgress('uploading', (i / files.length) * 100, 
-          `Processing ${files[i].name} (${i + 1} of ${files.length})`);
+        this.updateProgress('uploading', (completedCount / totalFiles) * 100,
+          `Processing ${file.name}... (${completedCount} of ${totalFiles} done)`);
         
-        const document = await this.processDocument(files[i]);
-        results.push(document);
+        const document = await this.processDocument(file, { silent: true });
+        results[index] = document;
       } catch (error) {
-        console.error(`Failed to process ${files[i].name}:`, error);
+        console.error(`Failed to process ${file.name}:`, error);
         // Continue with remaining files
+      } finally {
+        completedCount++;
+        this.updateProgress('uploading', (completedCount / totalFiles) * 100,
+          `Processed ${completedCount} of ${totalFiles} documents`);
       }
-    }
+    });
+
+    // Simple pool execution
+    const pool = async () => {
+      while (tasks.length > 0) {
+        const task = tasks.shift();
+        if (task) await task();
+      }
+    };
+
+    const workers = Array(Math.min(concurrencyLimit, files.length)).fill(null).map(pool);
+    await Promise.all(workers);
     
-    return results;
+    // Filter out nulls (failed documents)
+    return results.filter((doc): doc is Document => doc !== null);
   }
 
   // Search across all documents with natural language queries
