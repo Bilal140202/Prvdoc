@@ -59,7 +59,7 @@ export class PrivacyLLMService {
     }
   ];
 
-  async initialize(modelName?: string): Promise<void> {
+  async initialize(modelName?: string, retry = true): Promise<void> {
     if (this.isLoading) {
       throw new Error('Model is already loading');
     }
@@ -115,10 +115,41 @@ export class PrivacyLLMService {
       console.log('✅ LLM loaded successfully - Ready for private document analysis!');
       
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // Handle corrupted cache from previous failed downloads
+      // "offset is out of bounds" suggests reading past end of file (e.g. reading binary offset in HTML file)
+      // "Unexpected token <" suggests parsing HTML as JSON
+      if (retry && (
+        errorMessage.includes('offset is out of bounds') ||
+        errorMessage.includes('Unexpected token') ||
+        errorMessage.includes('invalid json')
+      )) {
+        console.warn('⚠️  Cache corruption detected. Clearing cache and retrying...');
+
+        try {
+          if ('caches' in window) {
+            const cacheKeys = await caches.keys();
+            for (const key of cacheKeys) {
+              if (key.includes('transformers')) {
+                await caches.delete(key);
+                console.log(`🧹 Deleted cache: ${key}`);
+              }
+            }
+          }
+
+          this.isLoading = false;
+          // Retry without recursion limit (retry=false)
+          return this.initialize(modelName, false);
+        } catch (cacheError) {
+          console.error('Failed to clear cache:', cacheError);
+        }
+      }
+
       this.downloadProgress = {
         ...this.downloadProgress!,
         status: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: errorMessage
       };
       
       console.error('❌ Failed to load LLM:', error);
