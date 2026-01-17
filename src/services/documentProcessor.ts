@@ -119,17 +119,19 @@ export class PrivacyDocumentProcessor {
       
       this.updateProgress('extracting', 20, `Extracting text from ${totalPages} pages...`);
 
-      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+      let pagesProcessed = 0;
+      const pagePromises = Array.from({ length: totalPages }, (_, i) => i + 1).map(async (pageNum) => {
         const page = await pdf.getPage(pageNum);
         const textContent = await page.getTextContent();
         
         let pageText = textContent.items
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .map((item: any) => item.str)
           .join(' ');
         
         // If no text found, try OCR
         if (pageText.trim().length < 50) {
-          this.updateProgress('extracting', 20 + (pageNum / totalPages) * 30, 
+          this.updateProgress('extracting', 20 + (pagesProcessed / totalPages) * 30,
             `Running OCR on page ${pageNum}...`);
           
           const viewport = page.getViewport({ scale: 2.0 });
@@ -147,15 +149,20 @@ export class PrivacyDocumentProcessor {
           const ocrText = await this.runOCR(canvas);
           pageText = ocrText || pageText;
         }
+
+        pagesProcessed++;
+        const progress = 20 + (pagesProcessed / totalPages) * 40;
+        this.updateProgress('extracting', progress,
+          `Processed page ${pageNum} of ${totalPages}`);
         
         if (pageText.trim()) {
-          fullText += `\n\n--- Page ${pageNum} ---\n${pageText}`;
+          return `\n\n--- Page ${pageNum} ---\n${pageText}`;
         }
-        
-        const progress = 20 + (pageNum / totalPages) * 40;
-        this.updateProgress('extracting', progress, 
-          `Processed page ${pageNum} of ${totalPages}`);
-      }
+        return '';
+      });
+
+      const pageTexts = await Promise.all(pagePromises);
+      fullText += pageTexts.join('');
       
       return fullText.trim();
       
