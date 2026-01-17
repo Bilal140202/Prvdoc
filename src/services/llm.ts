@@ -13,8 +13,9 @@ import type {
   AvailableModel
 } from '../types';
 
-// Configure Transformers.js for local-only operation
-env.allowLocalModels = true;
+// Configure Transformers.js
+// Disable local models to prevent 404 HTML fallback errors (SPA issue); uses remote + cache
+env.allowLocalModels = false;
 env.allowRemoteModels = true; // Only for initial model download
 env.useBrowserCache = true;
 
