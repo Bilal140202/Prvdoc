@@ -2,7 +2,7 @@
 // Supports PDF (text + OCR), DOCX, TXT, and audio files
 
 import * as pdfjsLib from 'pdfjs-dist';
-import { createWorker } from 'tesseract.js';
+import { createWorker, Worker } from 'tesseract.js';
 import mammoth from 'mammoth';
 import type { 
   Document, 
@@ -110,6 +110,7 @@ export class PrivacyDocumentProcessor {
   }
 
   private async processPDF(file: File): Promise<string> {
+    let worker: Worker | null = null;
     try {
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -144,7 +145,10 @@ export class PrivacyDocumentProcessor {
             canvas: canvas
           }).promise;
           
-          const ocrText = await this.runOCR(canvas);
+          if (!worker) {
+            worker = await createWorker('eng');
+          }
+          const ocrText = await this.runOCR(canvas, worker);
           pageText = ocrText || pageText;
         }
         
@@ -162,14 +166,20 @@ export class PrivacyDocumentProcessor {
     } catch (error) {
       console.error('PDF processing error:', error);
       throw new Error(`Failed to process PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      if (worker) {
+        await worker.terminate();
+      }
     }
   }
 
-  private async runOCR(canvas: HTMLCanvasElement): Promise<string> {
+  private async runOCR(canvas: HTMLCanvasElement, worker?: Worker): Promise<string> {
     try {
-      const worker = await createWorker('eng');
-      const { data: { text } } = await worker.recognize(canvas);
-      await worker.terminate();
+      const w = worker || await createWorker('eng');
+      const { data: { text } } = await w.recognize(canvas);
+      if (!worker) {
+        await w.terminate();
+      }
       return text;
     } catch (error) {
       console.error('OCR failed:', error);
