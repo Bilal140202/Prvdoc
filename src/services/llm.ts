@@ -201,7 +201,9 @@ export class PrivacyLLMService {
         bytesLoaded: progress.loaded,
         totalBytes: progress.total,
         progress: Math.round((progress.loaded / progress.total) * 100),
-        speed: progress.speed
+        speed: progress.speed,
+        // Show specific file being downloaded if available (e.g. "Downloading model.onnx...")
+        message: progress.file ? `Downloading ${progress.file}...` : this.downloadProgress.message
       };
     }
   }

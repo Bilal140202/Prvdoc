@@ -21,8 +21,9 @@ def verify_app_loads():
             else:
                 print("SUCCESS: App loaded without immediate errors.")
 
-            # We can't easily trigger the WASM error in this environment without a full download
-            # but we can verify the app still starts.
+            # Verify ModelDownloader component text changed
+            # We can't verify the specific text without a download, but we can check if the element structure is compatible
+            # Actually, the change is dynamic based on download state.
 
         except Exception as e:
             print(f"Error: {e}")
