@@ -102,6 +102,7 @@ export interface ModelDownloadProgress {
   speed?: number; // bytes per second
   status: 'downloading' | 'loading' | 'ready' | 'error';
   error?: string;
+  message?: string;
 }
 
 export interface AvailableModel {

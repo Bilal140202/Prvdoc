@@ -72,6 +72,25 @@ export class PrivacyLLMService {
 
       console.log(`🤖 Loading ${targetModel} - ALL processing stays local!`);
       
+      // Check storage availability before starting download
+      if ('storage' in navigator && 'estimate' in navigator.storage) {
+        let estimate;
+        try {
+          estimate = await navigator.storage.estimate();
+        } catch (storageError) {
+          console.warn('⚠️ Could not verify storage space:', storageError);
+        }
+
+        if (estimate && estimate.quota && estimate.usage) {
+          const availableSpace = estimate.quota - estimate.usage;
+          const requiredSpace = this.getModelSize(targetModel) * 2; // Buffer for unzip/cache
+
+          if (availableSpace < requiredSpace) {
+            throw new Error(`Insufficient storage space. Need ${Math.round(requiredSpace / 1024 / 1024)}MB, but only ${Math.round(availableSpace / 1024 / 1024)}MB available.`);
+          }
+        }
+      }
+
       // Set up progress tracking
       this.downloadProgress = {
         modelName: targetModel,
@@ -129,6 +148,13 @@ export class PrivacyLLMService {
 
         try {
           if ('caches' in window) {
+            // Inform user we are recovering
+            this.downloadProgress = {
+              ...this.downloadProgress!,
+              status: 'downloading', // Keep status as downloading so UI doesn't show error yet
+              message: 'Cache corruption detected. Clearing cache and retrying...'
+            };
+
             const cacheKeys = await caches.keys();
             for (const key of cacheKeys) {
               if (key.includes('transformers')) {
@@ -136,6 +162,9 @@ export class PrivacyLLMService {
                 console.log(`🧹 Deleted cache: ${key}`);
               }
             }
+
+            // Wait a moment for cache operations to settle
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
 
           this.isLoading = false;
